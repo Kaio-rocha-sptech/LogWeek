@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apontamentos | LogWeek</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body onload="iniciarPagina()">
+  <main class="app-shell">
+    <aside class="notes-sidebar">
+      <div class="sidebar-header">
+        <div><p class="eyebrow">LOGWEEK</p><h2>Notas da semana</h2></div>
+        <button type="button" class="text-button" id="atualizarNotas" onclick="atualizarLista()">Atualizar</button>
+      </div>
+      <label class="week-selector" for="seletorSemana">Semana
+        <select id="seletorSemana" onchange="renderizarNotas()"></select>
+      </label>
+      <div id="notesList" class="notes-list">
+        <p id="carregandoNotas" class="empty-state">Carregando notas...</p>
+        <p id="semNotas" class="empty-state" hidden>Nenhuma nota nesta semana.</p>
+      </div>
+      <!-- O JavaScript copia este card para cada nota e preenche somente os dados. -->
+      <template id="modeloNota">
+        <article class="note-item">
+          <strong class="note-title"></strong>
+          <span class="note-date"></span>
+          <p class="note-preview"></p>
+          <div class="note-item-footer">
+            <span class="note-time"></span>
+            <div class="note-actions">
+              <button type="button" class="note-action edit" onclick="editarNota(Number(this.value))">Editar</button>
+              <button type="button" class="note-action delete" onclick="excluirNota(Number(this.value))">Excluir</button>
+            </div>
+          </div>
+        </article>
+      </template>
+      <button class="primary-button report-button" type="button" id="exportarNotas" onclick="exportarNotas()">Gerar apontamento semanal</button>
+      <span class="secondary-text">Um arquivo .txt com as notas salvas.</span>
+    </aside>
+    <section class="workspace">
+      <header class="workspace-header">
+        <div><p id="userLabel" class="eyebrow">LogWeek</p><h1 id="editorTitulo">Nova nota</h1></div>
+        <button class="text-button" type="button" id="sair" onclick="sair()">Sair</button>
+      </header>
+      <form id="formApontamento" class="formulario note-form" onsubmit="salvarApontamento(); return false;">
+        <label class="title-field" for="titulo">Título
+          <input id="titulo" name="titulo" type="text" maxlength="200" placeholder="O que você está fazendo?" required autocomplete="off" oninput="registrarInicio()">
+        </label>
+        <label class="observation-field" for="conteudo">Observação <span class="optional-label">opcional</span>
+          <textarea id="conteudo" name="conteudo" maxlength="100000" placeholder="Registre o que vale lembrar..." oninput="registrarInicio()"></textarea>
+        </label>
+        <div class="time-strip">
+          <label for="inicio">Início <input id="inicio" type="time" step="60" onchange="corrigirInicio()"></label>
+          <span id="fimNota">Fim: automático ao salvar</span>
+          <span id="duracaoNota"></span>
+          <span id="dataNota"></span>
+        </div>
+        <div class="form-actions">
+          <span id="semanaAtual" class="secondary-text"></span>
+          <button class="ghost-button" type="button" id="novaNota" onclick="limparNota()">Nova nota</button>
+          <button class="primary-button" type="submit" id="salvarNota">Salvar nota</button>
+        </div>
+      </form>
+      <p id="mensagem" class="message" aria-live="polite"></p>
+    </section>
+  </main>
+  <a id="downloadRelatorio" hidden download></a>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
+

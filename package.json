@@ -1,0 +1,13 @@
+{
+  "name": "logweek",
+  "version": "1.0.0",
+  "description": "Notas de atividades e geração de apontamentos semanais com o LogWeek.",
+  "private": true,
+  "scripts": {
+    "start": "node app.js",
+    "check": "node --check app.js && node --check public/js/usuarios.js && node --check public/js/dashboard.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | LogWeek</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <section class="auth-panel">
+      <p class="eyebrow">Apontamentos Semanais</p>
+      <h1>Bem-vindo de volta.</h1>
+      <p class="muted">Entre para consultar e escrever seus apontamentos semanais.</p>
+
+      <form id="formLogin" class="formulario" onsubmit="entrar(this); return false;">
+        <label>
+          Email
+          <input id="email" name="email" type="email" autocomplete="email" required>
+        </label>
+
+        <label>
+          Senha
+          <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+        </label>
+
+        <button class="primary-button" type="submit">Entrar</button>
+      </form>
+
+      <p id="mensagem" class="message"></p>
+
+      <p class="auth-link">
+        Ainda não tem conta?
+        <a href="cadastro.html">Criar cadastro</a>
+      </p>
+    </section>
+  </main>
+
+  <script src="js/usuarios.js"></script>
+</body>
+</html>
