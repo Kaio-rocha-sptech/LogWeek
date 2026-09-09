@@ -18,6 +18,13 @@ target/
 *.iml
 *.iws
 *.ipr
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated/
+.springBeans
+.sts4-cache/
 
 # Logs e arquivos temporários
 *.log

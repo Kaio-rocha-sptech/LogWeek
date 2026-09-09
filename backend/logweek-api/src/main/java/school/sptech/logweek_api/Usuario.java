@@ -1,6 +1,5 @@
 package school.sptech.logweek_api;
 
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class Usuario {
@@ -10,9 +9,6 @@ public class Usuario {
     private String senha;
     private String nome;
     private String criadoEm;
-
-    public Usuario() {
-    }
 
     public Integer getId() {
         return id;

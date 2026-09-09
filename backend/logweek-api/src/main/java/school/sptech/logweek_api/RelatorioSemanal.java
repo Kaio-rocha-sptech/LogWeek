@@ -1,8 +1,11 @@
 package school.sptech.logweek_api;
 
-import java.time.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 public class RelatorioSemanal {
     private static final String LINHA = "============================================================\n";
@@ -12,7 +15,9 @@ public class RelatorioSemanal {
 
     // Remove a formatacao das notas antigas somente na exportacao.
     private static String textoSimples(String texto) {
-        if (texto == null) return "";
+        if (texto == null) {
+            return "";
+        }
         return texto.replaceAll("(?m)^\\s{0,3}#{1,6}\\s+", "")
                 .replaceAll("(?m)^\\s*```[^\\n]*", "")
                 .replaceAll("(?m)^\\s*[-*+]\\s+", "")
@@ -50,17 +55,22 @@ public class RelatorioSemanal {
                 texto.append("\n------------------------------------------------------------\n\n").append(grupo).append("\n");
                 grupoAnterior = grupo;
             }
-            if (nota.getInicioEm() == null || nota.getFimEm() == null) texto.append("\n[Horário não registrado]\n");
-            else {
+            if (nota.getInicioEm() == null || nota.getFimEm() == null) {
+                texto.append("\n[Horário não registrado]\n");
+            } else {
                 LocalDateTime inicio = TempoApontamento.dataHora(nota.getInicioEm());
                 LocalDateTime fim = TempoApontamento.dataHora(nota.getFimEm());
                 texto.append("\n[").append(inicio.format(HORA)).append(" - ").append(fim.format(HORA));
-                if (!inicio.toLocalDate().equals(fim.toLocalDate())) texto.append(" (").append(fim.format(DATA)).append(")");
+                if (!inicio.toLocalDate().equals(fim.toLocalDate())) {
+                    texto.append(" (").append(fim.format(DATA)).append(")");
+                }
                 texto.append(" | ").append(TempoApontamento.duracao(nota.getDuracaoMinutos())).append("]\n");
             }
             texto.append(nota.getTitulo().trim()).append("\n");
             String observacao = nota.getInicioEm() == null ? textoSimples(nota.getConteudo()) : nota.getConteudo().trim();
-            if (!observacao.isEmpty()) texto.append("\n").append(observacao).append("\n");
+            if (!observacao.isEmpty()) {
+                texto.append("\n").append(observacao).append("\n");
+            }
         }
         texto.append("\n").append(LINHA).append("RESUMO DA SEMANA\n").append(LINHA)
                 .append("\nApontamentos: ").append(notas.size()).append("\nTempo registrado: ").append(tempo)

@@ -13,46 +13,41 @@ import java.util.List;
 import java.util.Locale;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
+@RequestMapping("/usuarios")
+@CrossOrigin(
+        origins = {
+                "http://localhost:3000",
+                "http://127.0.0.1:3000"
+        },
+        allowCredentials = "true"
+)
 public class UsuarioController {
     private final JdbcTemplate jdbcTemplate;
     private final BeanPropertyRowMapper<Usuario> mapearUsuario = new BeanPropertyRowMapper<>(Usuario.class);
-    public UsuarioController(JdbcTemplate jdbcTemplate) { this.jdbcTemplate = jdbcTemplate; }
 
-    private boolean emailValido(String email) {
-        if (email == null || email.length() > 254 || email.contains(" ")) return false;
-        String[] dominios = {"@email.com", "@gmail.com", "@hotmail.com", "@outlook.com", "@sptech.school"};
-        for (String dominio : dominios) {
-            if (email.endsWith(dominio) && email.indexOf('@') > 0 && email.indexOf('@') == email.lastIndexOf('@')) return true;
-        }
-        return false;
+    public UsuarioController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
     }
-    private boolean senhaValida(String senha) {
-        if (senha == null || senha.length() < 8 || senha.length() > 128) return false;
-        boolean letra = false;
-        boolean especial = false;
-        for (int i = 0; i < senha.length(); i++) {
-            if (Character.isLetter(senha.charAt(i))) letra = true;
-            if ("@!#$*&-_=+".indexOf(senha.charAt(i)) >= 0) especial = true;
-        }
-        return letra && especial;
-    }
-    private boolean nomeValido(String nome) {
-        if (nome == null || nome.trim().length() < 6 || nome.length() > 100) return false;
-        for (int i = 0; i < nome.length(); i++) {
-            if (!Character.isLetter(nome.charAt(i)) && nome.charAt(i) != ' ') return false;
-        }
-        return true;
-    }
-    @PostMapping("/usuarios")
+
+    @PostMapping
     public ResponseEntity<Usuario> novoUsuario(@RequestBody Usuario usuario) {
-        if (usuario.getEmail() != null) usuario.setEmail(usuario.getEmail().trim().toLowerCase(Locale.ROOT));
-        if (!nomeValido(usuario.getNome())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome: use de 6 a 100 caracteres, somente letras e espaços.");
-        if (!emailValido(usuario.getEmail())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use um email válido de email.com, gmail.com, hotmail.com, outlook.com ou sptech.school.");
-        if (!senhaValida(usuario.getSenha())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha: use de 8 a 128 caracteres, uma letra e um símbolo: @ ! # $ * & - _ = +.");
+        String nome = usuario.getNome();
+        String senha = usuario.getSenha();
+        if (usuario.getEmail() != null) {
+            usuario.setEmail(usuario.getEmail().trim().toLowerCase(Locale.ROOT));
+        }
+        if (nome == null || nome.isBlank() || nome.length() > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe um nome de até 100 caracteres.");
+        }
+        if (!emailValido(usuario.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe um email válido de até 254 caracteres.");
+        }
+        if (senha == null || senha.isBlank() || senha.length() < 8 || senha.length() > 128) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe uma senha de 8 a 128 caracteres.");
+        }
         try {
             jdbcTemplate.update("INSERT INTO usuarios (nome, email, senha) VALUES (?, ?, ?)",
-                    usuario.getNome().trim(), usuario.getEmail(), SenhaUtil.gerar(usuario.getSenha()));
+                    nome.trim(), usuario.getEmail(), SenhaUtil.gerar(senha));
         } catch (DuplicateKeyException erro) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Este email ja esta cadastrado.");
         }
@@ -60,6 +55,7 @@ public class UsuarioController {
                 mapearUsuario, usuario.getEmail());
         return ResponseEntity.status(201).body(salvo);
     }
+
     @PostMapping("/login")
     public Usuario validarLogin(@RequestBody Usuario usuario, HttpServletRequest request) {
         if (usuario.getEmail() == null || usuario.getEmail().isBlank() || usuario.getSenha() == null || usuario.getSenha().isBlank() || usuario.getSenha().length() > 128) {
@@ -71,11 +67,38 @@ public class UsuarioController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email ou senha incorretos.");
         }
         HttpSession anterior = request.getSession(false);
-        if (anterior != null) anterior.invalidate();
+        if (anterior != null) {
+            anterior.invalidate();
+        }
         Usuario salvo = encontrados.get(0);
         request.getSession(true).setAttribute("emailUsuario", salvo.getEmail());
         return salvo;
     }
+
+    @GetMapping("/atual")
+    public Usuario usuarioAtual(HttpServletRequest request) {
+        return jdbcTemplate.queryForObject("SELECT * FROM usuarios WHERE email = ?",
+                mapearUsuario, emailDaSessao(request));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> sair(HttpServletRequest request) {
+        HttpSession sessao = request.getSession(false);
+        if (sessao != null) {
+            sessao.invalidate();
+        }
+        return ResponseEntity.noContent().build();
+    }
+
+    private boolean emailValido(String email) {
+        if (email == null || email.length() > 254 || email.contains(" ")) {
+            return false;
+        }
+        int arroba = email.indexOf('@');
+        return arroba > 0 && arroba < email.length() - 1 && arroba == email.lastIndexOf('@');
+    }
+
+    // Reutilizado na controller de apontamentos para identificar o dono das notas.
     public static String emailDaSessao(HttpServletRequest request) {
         HttpSession sessao = request.getSession(false);
         if (sessao == null || sessao.getAttribute("emailUsuario") == null) {
@@ -83,16 +106,4 @@ public class UsuarioController {
         }
         return (String) sessao.getAttribute("emailUsuario");
     }
-    @GetMapping("/auth/me")
-    public Usuario usuarioAtual(HttpServletRequest request) {
-        return jdbcTemplate.queryForObject("SELECT * FROM usuarios WHERE email = ?",
-                mapearUsuario, emailDaSessao(request));
-    }
-    @PostMapping("/auth/logout")
-    public ResponseEntity<Void> sair(HttpServletRequest request) {
-        HttpSession sessao = request.getSession(false);
-        if (sessao != null) sessao.invalidate();
-        return ResponseEntity.noContent().build();
-    }
 }
-

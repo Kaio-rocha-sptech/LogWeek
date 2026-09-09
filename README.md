@@ -61,18 +61,24 @@ cd backend/logweek-api
 sh mvnw spring-boot:run
 ```
 
-O Maven Wrapper acompanha o projeto; não é necessário instalar Maven separadamente.
+O Maven Wrapper acompanha o projeto; não é necessário instalar Maven separadamente. Se preferir iniciar o backend sem sair da raiz, no Windows use:
+
+```powershell
+.\backend\logweek-api\mvnw.cmd -f backend/logweek-api/pom.xml spring-boot:run
+```
+
+O plugin do Spring Boot usa a pasta do módulo como diretório de trabalho.
 
 ### 3. Abrir a aplicação
 
-Acesse [LogWeek](http://localhost:3000). A API atende em `http://localhost:8080`. Utilize **localhost** nas duas portas para manter a configuração de sessão e CORS.
+Acesse [LogWeek](http://localhost:3000). A API atende na porta 8080. Também é possível abrir [LogWeek por IP local](http://127.0.0.1:3000): o frontend usa o mesmo host da página para preservar a sessão. Abra as páginas pelo Express, não diretamente como arquivos.
 
 Cadastre uma conta ou use a conta de demonstração:
 
 - Email: `demo@email.com`
 - Senha: `Logweek123!`
 
-O banco e a conta demo são criados automaticamente quando necessários. Execute o backend dentro de `backend/logweek-api`: os dados ficam em `dados/logweek.mv.db`, relativo a esse diretório. No IntelliJ, importe o `pom.xml`, selecione JDK 21, use esse diretório de trabalho e execute `LogweekApiApplication`.
+O banco e a conta demo são criados automaticamente quando necessários. Execute o backend dentro de `backend/logweek-api`: os dados ficam em `dados/logweek.mv.db`, relativo a esse diretório. No IntelliJ, importe `backend/logweek-api/pom.xml` como projeto Maven, selecione JDK 21, use esse diretório de trabalho e execute `LogweekApiApplication`. Se abrir a raiz como pasta, adicione esse POM pela janela Maven. Não é necessário copiar configurações `.idea` do repositório anterior.
 
 O banco local não vai para o GitHub. Não apague o arquivo de dados caso queira preservar suas notas. As portas 3000 e 8080 precisam estar disponíveis.
 
@@ -124,7 +130,7 @@ cd backend/logweek-api
 .\mvnw.cmd clean verify
 ```
 
-No Linux/macOS, use `sh mvnw clean verify`. Os testes usam H2 em memória ou arquivo temporário isolado e não alteram suas notas. O comando gera o pacote `target/logweek-api-0.0.1-SNAPSHOT.jar`.
+No Linux/macOS, use `sh mvnw clean verify`. Os testes usam H2 em memória ou arquivo temporário isolado e não alteram suas notas. O comando gera o pacote `target/logweek-api-0.0.1-SNAPSHOT.jar`. Encerre uma execução desse JAR antes de usar `clean`, pois o Windows mantém o arquivo em uso. Os testes mantidos cobrem API, CORS, datas e persistência; o teste vazio de inicialização foi removido porque os testes de integração já iniciam o Spring Boot.
 
 ## Arquivos locais e configuração
 

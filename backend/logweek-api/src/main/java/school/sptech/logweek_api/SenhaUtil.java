@@ -19,15 +19,19 @@ public class SenhaUtil {
             throw new IllegalStateException("Nao foi possivel proteger a senha", erro);
         }
     }
+
     public static String gerar(String senha) {
         byte[] bytes = new byte[16];
         new SecureRandom().nextBytes(bytes);
         String salt = Base64.getEncoder().encodeToString(bytes);
         return salt + ":" + calcular(senha, salt);
     }
+
     public static boolean conferir(String senha, String salvo) {
         String[] partes = salvo.split(":");
-        if (partes.length != 2) return false;
+        if (partes.length != 2) {
+            return false;
+        }
         return MessageDigest.isEqual(calcular(senha, partes[0]).getBytes(StandardCharsets.UTF_8),
                 partes[1].getBytes(StandardCharsets.UTF_8));
     }

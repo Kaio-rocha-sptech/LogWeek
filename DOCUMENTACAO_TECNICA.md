@@ -44,7 +44,7 @@ O fluxo usual é: JSON convertido em objeto → sessão e dados validados → SQ
 
 `Usuario` representa `id`, `email`, `senha`, `nome` e `criadoEm`. A senha possui `@JsonProperty(WRITE_ONLY)`: pode entrar no JSON, mas não sai nas respostas, inclusive após leitura do hash no banco.
 
-`Apontamento` representa os campos da tabela e expõe três propriedades calculadas: `inicioSemana` (segunda-feira em ISO), `dataApontamento` (data da atividade ou criação antiga) e `duracaoMinutos` (nula se não há período). Seus getters participam da serialização JSON; setters e construtores vazios são necessários ao mapeamento JDBC e à leitura dos corpos HTTP, mesmo sem chamadas explícitas no código.
+`Apontamento` representa os campos da tabela e expõe três propriedades calculadas: `inicioSemana` (segunda-feira em ISO), `dataApontamento` (data da atividade ou criação antiga) e `duracaoMinutos` (nula se não há período). Seus getters participam da serialização JSON; getters e setters também são usados pelo mapeamento JDBC e pela conversão JSON. Como os modelos não declaram construtores, Java fornece o construtor público sem argumentos; não é necessário escrevê-lo vazio.
 
 ### Validações e erros
 
@@ -71,7 +71,7 @@ Erros esperados usam `ResponseStatusException`: 400 para entrada inválida, 401 
 
 `notaSelecionadaId` decide entre POST e PUT; `inicioEm`, `fimEm` e `notaAntiga` controlam horários; `notasCarregadas` guarda a lista retornada pela API; `salvando` evita salvamentos concorrentes e impede trocar a seleção durante o salvamento.
 
-Os dois scripts usam `http://localhost:8080` e `credentials: "include"`. As operações de dados não passam pelo Express. O dashboard centraliza respostas HTTP em `requisitar`: 401 limpa o cache do usuário e abre o login; outras falhas mostram a mensagem retornada. `sessionStorage` guarda apenas um cache visual dos dados do usuário; a API sempre usa a sessão do servidor para autorizar.
+Os dois scripts montam a URL da API com o protocolo e o host da página, na porta 8080, e usam `credentials: "include"`. Assim, acessar por `localhost` ou `127.0.0.1` mantém página e cookie no mesmo host. As operações de dados não passam pelo Express. O dashboard centraliza respostas HTTP em `requisitar`: 401 limpa o cache do usuário e abre o login; outras falhas mostram a mensagem retornada. `sessionStorage` guarda apenas um cache visual dos dados do usuário; a API sempre usa a sessão do servidor para autorizar.
 
 `iniciarPagina` prepara o editor vazio, consulta `/auth/me`, mostra o nome e carrega as notas. Ao salvar, `dadosDaNota` envia título, conteúdo, início e semana. Para notas atuais, a API recalcula a semana. O retorno preenche o editor com os valores oficiais e atualiza a lista para a semana salva. A exclusão pede confirmação no navegador e limpa o editor se a nota excluída estava selecionada.
 
@@ -202,7 +202,7 @@ Exemplo de criação:
 
 O horário precisa ser anterior ou igual ao momento do primeiro salvamento. A resposta inclui `id`, `emailUsuario`, `semana`, `titulo`, `conteudo`, `criadoEm`, `atualizadoEm`, `inicioEm`, `fimEm`, `inicioSemana`, `dataApontamento` e `duracaoMinutos`. Campos de data/hora persistidos podem vir como texto SQL com espaço; o frontend normaliza a parte usada no editor.
 
-CORS permite `http://localhost:3000` com credenciais nos dois controllers. A rota `/h2-console` é a interface administrativa local do H2, não um endpoint de negócio.
+CORS permite `http://localhost:3000` e `http://127.0.0.1:3000` com credenciais nos dois controllers. Outras origens continuam bloqueadas. A rota `/h2-console` é a interface administrativa local do H2, não um endpoint de negócio.
 
 ## 9. Como executar o projeto
 
@@ -213,7 +213,7 @@ CORS permite `http://localhost:3000` com credenciais nos dois controllers. A rot
 5. Abra [LogWeek](http://localhost:3000), cadastre uma conta ou use `demo@email.com` / `Logweek123!`.
 6. No IntelliJ, importe o `pom.xml`, escolha JDK 21, configure o diretório de trabalho para `backend/logweek-api` e execute `LogweekApiApplication`.
 
-As portas 3000 e 8080 precisam estar disponíveis. Abrir o HTML por `file://`, usar `127.0.0.1` ou mudar uma porta sem ajustar a base da API e o CORS não corresponde à configuração atual.
+As portas 3000 e 8080 precisam estar disponíveis. Use `http://localhost:3000` ou `http://127.0.0.1:3000`. Abrir o HTML por `file://` ou mudar uma porta sem ajustar a base da API e o CORS não corresponde à configuração atual.
 
 O H2 Console fica em [Console local](http://localhost:8080/h2-console): JDBC `jdbc:h2:file:./dados/logweek`, usuário `sa`, senha vazia. A configuração está em `application.properties`. Para testes externos, uma instância pode receber `--server.port=18080` e `--spring.datasource.url=jdbc:h2:file:CAMINHO_TEMPORARIO/logweek`, sem alterar esse arquivo.
 
@@ -233,14 +233,14 @@ O primeiro uso do Wrapper/build requer acesso ao Maven Central. Falha de rede n�
 
 ## 10. Observações importantes
 
-- A versão atual é configurada para execução local: console H2 habilitado, conta demo, HTTP e origem fixa. Publicação exige uma configuração própria para essas condições; não foi realizada nesta revisão.
+- A versão atual é configurada para execução local: console H2 habilitado, conta demo, HTTP e duas origens locais permitidas. Publicação exige uma configuração própria para essas condições; não foi realizada nesta revisão.
 - A API carrega todas as notas do usuário; o filtro visual e o filtro do relatório são feitos em memória. Não há paginação ou busca textual.
 - Durações são somadas sem descontar sobreposição entre notas. Isso preserva a regra atual. Tempos representam hora civil, sem offset armazenado; o editor calcula duração com `-03:00`, adequado às atividades atuais, mas não modela mudanças históricas de horário de verão.
 - `criado_em` e `atualizado_em` vêm do relógio do banco; início/fim usam São Paulo. Em máquinas com outro fuso, esses campos podem representar convenções distintas, especialmente em registros antigos.
 - O parser legado usa a data inicial para identificar a semana; o final do texto não é uma segunda validação de intervalo. Para novas integrações, prefira `semana` ISO da segunda-feira retornada como `inicioSemana`.
 - O frontend remove espaços das extremidades do conteúdo ao salvar. A API aceita conteúdo vazio e trata ausência como vazio também em PUT.
 - Navegar para outra nota, iniciar uma nova ou sair não oferece confirmação para descartar rascunho. Não há salvamento automático.
-- SQL de compatibilidade, getters/setters usados por reflexão, Maven Wrapper, lockfile e página `index.html` fazem parte do projeto. O banco e as configurações da IDE são apenas locais e ficam fora do versionamento.
+- SQL de compatibilidade, getters/setters usados pelo framework, Maven Wrapper, lockfile e página `index.html` fazem parte do projeto. O banco e as configurações da IDE são apenas locais e ficam fora do versionamento.
 - Os testes Java de integração executam HTTP real e usam bancos isolados. Não há uma suíte JavaScript no repositório: `npm run check` verifica apenas a sintaxe de `app.js`, `usuarios.js` e `dashboard.js`.
 
 
@@ -256,4 +256,18 @@ Execute `npm ci` e `npm run check` na raiz, e `mvnw.cmd clean verify` dentro do 
 
 A configuração também explicita UTF-8 dos scripts SQL, mensagens de erro enviadas ao frontend e as propriedades de sessão descritas acima. Não são necessárias configurações pessoais de IDE para executar pelo terminal.
 
-Validação em 08/09/2026: instalação das dependências pelo lockfile em diretório temporário e `npm run check` aprovados; build `clean verify` aprovado com 8 testes Java, sem falhas. Foram conferidas as regras de exclusão do Git para banco, dependências e arquivos locais. A verificação de sintaxe não substitui testes funcionais do frontend; não há suíte JavaScript versionada. O Maven emitiu avisos de autoanexação Mockito/Byte Buddy no JDK 21, sem impedir os testes.
+A suíte Java mantém testes de fluxo HTTP, permissões entre usuários, horários, exportação, CORS e persistência. As dependências de teste são `spring-boot-test` e `junit-jupiter`; não são usados Mockito, MockMvc, AssertJ ou ferramentas de teste XML/JSON. O teste vazio `contextLoads` foi removido por repetir a inicialização já exercitada pelos testes de integração. As configurações Git agora ficam na raiz, evitando arquivos duplicados no módulo.
+
+### Revisão de 09/09/2026
+
+A versão recebida compilou e passou nos testes antes das alterações: não foi reproduzido erro de package, import ou dependência ausente causado pela mudança de repositório. Foi reproduzido um bloqueio de CORS ao abrir o frontend por `127.0.0.1:3000`: a API aceitava apenas `localhost:3000`, e os scripts sempre apontavam para `localhost:8080`. A correção mantém o host usado no navegador e permite as duas origens locais, preservando a autenticação por sessão.
+
+O backend continua usando SQL direto nos controllers e os mesmos auxiliares de senha, tempo e relatório. A revisão tornou imports, métodos e validações mais legíveis, removeu construtores vazios redundantes, o teste de contexto vazio e configurações Git duplicadas. A dependência indireta npm `qs` foi atualizada dentro da faixa compatível com Express. O schema, os dados existentes e as regras de negócio foram preservados.
+
+Validação realizada:
+
+- `mvnw.cmd clean verify`: build aprovado, 8 testes, sem falhas ou erros; inclui HTTP real, isolamento entre usuários, exportação, CORS e persistência em arquivo após reiniciar.
+- `npm ci` e `npm run check`: instalação reproduzível e sintaxe aprovadas; zero vulnerabilidades reportadas pelo npm nesta execução.
+- Spring Boot iniciado pela raiz com `mvnw.cmd -f backend/logweek-api/pom.xml spring-boot:run`, confirmando o diretório de trabalho do módulo; os testes manuais usaram banco temporário.
+- Navegador: login em `localhost` e `127.0.0.1`; criação, edição, geração de relatório e logout pelo frontend em `127.0.0.1`.
+- Referências e alterações conferidas com busca no código, `git diff --check` e revisão independente. Os servidores temporários foram encerrados ao concluir os testes.

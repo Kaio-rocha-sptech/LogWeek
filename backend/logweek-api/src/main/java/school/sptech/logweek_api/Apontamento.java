@@ -1,5 +1,6 @@
 package school.sptech.logweek_api;
 
+import java.time.Duration;
 
 public class Apontamento {
     private Integer id;
@@ -12,18 +13,35 @@ public class Apontamento {
     private String inicioEm;
     private String fimEm;
 
-    public String getInicioEm() { return inicioEm; }
-    public void setInicioEm(String inicioEm) { this.inicioEm = inicioEm; }
-    public String getFimEm() { return fimEm; }
-    public void setFimEm(String fimEm) { this.fimEm = fimEm; }
-    public String getInicioSemana() { return TempoApontamento.semanaDaNota(this).toString(); }
-    public String getDataApontamento() { return TempoApontamento.dataDaNota(this).toString(); }
-    public Long getDuracaoMinutos() {
-        if (inicioEm == null || fimEm == null) return null;
-        return java.time.Duration.between(TempoApontamento.dataHora(inicioEm), TempoApontamento.dataHora(fimEm)).toMinutes();
+    public String getInicioEm() {
+        return inicioEm;
     }
 
-    public Apontamento() {
+    public void setInicioEm(String inicioEm) {
+        this.inicioEm = inicioEm;
+    }
+
+    public String getFimEm() {
+        return fimEm;
+    }
+
+    public void setFimEm(String fimEm) {
+        this.fimEm = fimEm;
+    }
+
+    public String getInicioSemana() {
+        return TempoApontamento.semanaDaNota(this).toString();
+    }
+
+    public String getDataApontamento() {
+        return TempoApontamento.dataDaNota(this).toString();
+    }
+
+    public Long getDuracaoMinutos() {
+        if (inicioEm == null || fimEm == null) {
+            return null;
+        }
+        return Duration.between(TempoApontamento.dataHora(inicioEm), TempoApontamento.dataHora(fimEm)).toMinutes();
     }
 
     public Integer getId() {
