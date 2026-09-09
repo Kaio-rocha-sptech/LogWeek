@@ -1,273 +1,700 @@
-# Documentação Técnica
-
-## 1. Visão geral
-
-O LogWeek permite cadastrar uma conta, entrar, registrar notas sobre atividades, editar ou excluir essas notas, consultar semanas anteriores e gerar um apontamento semanal em arquivo `.txt`.
-
-Cada nota contém título, observação opcional e, nas notas atuais, início e término. O início é registrado na primeira digitação; o término é definido pelo servidor ao salvar pela primeira vez. A semana é calculada a partir da data de início. Os dados de cada usuário são separados pela sessão autenticada.
-
-A aplicação tem dois processos: Express serve arquivos na porta 3000; Spring Boot atende requisições de dados na porta 8080. O H2 funciona dentro do processo Java, sem servidor de banco separado.
-
-## 2. Estrutura do projeto
-
-| Local | Responsabilidade |
-| --- | --- |
-| `app.js`, `package.json`, `package-lock.json` | Servir as páginas e definir scripts e dependências Node. O lockfile fixa a árvore instalada. |
-| `public/*.html` | Estrutura das páginas de apresentação, cadastro, login e dashboard. |
-| `public/styles.css` | Aparência compartilhada e adaptação para telas pequenas. |
-| `public/js/usuarios.js` | Formulários de cadastro e login. |
-| `public/js/dashboard.js` | Estado do editor, horários, lista, filtro semanal, operações HTTP e download. |
-| `backend/logweek-api/pom.xml` | Java 21, Spring Boot 4.1.1, JDBC, MVC, H2 e testes. |
-| `backend/logweek-api/src/main/java/school/sptech/logweek_api/` | Inicialização, controllers, modelos e auxiliares de senha, tempo e relatório. |
-| `backend/logweek-api/src/main/resources/` | Configuração e scripts SQL de inicialização. |
-| `backend/logweek-api/src/test/` | Testes automatizados Java de API, datas e persistência. |
-| `backend/logweek-api/dados/` | Banco persistido; não é código descartável. |
-| `backend/logweek-api/.mvn/`, `mvnw`, `mvnw.cmd` | Maven Wrapper para executar o build sem instalar Maven manualmente. |
-
-`node_modules/` e `target/` são dependências e resultados gerados. Os arquivos da IDE são configurações locais, ignoradas pelo Git. O `.gitignore` exclui dependências instaladas, resultados de compilação, dados locais, logs e configurações pessoais. O `.gitattributes` define finais de linha para uso entre Windows e Unix.
-
-## 3. Backend
-
-### Estrutura e fluxo
-
-`LogweekApiApplication.main()` inicia o Spring Boot. O framework identifica os controllers pelas anotações e injeta `JdbcTemplate` nos construtores. Não há JPA, repositories ou camada de serviços: o SQL está nos métodos que atendem as requisições.
-
-O fluxo usual é: JSON convertido em objeto → sessão e dados validados → SQL parametrizado executado por `JdbcTemplate` → resultado convertido em objeto → resposta JSON. Cada controller reutiliza um `BeanPropertyRowMapper`, que relaciona nomes SQL como `email_usuario` a propriedades Java como `emailUsuario`.
-
-### Controllers
-
-`UsuarioController` recebe cadastro e login, consulta o usuário atual e encerra sessões. Os métodos privados `nomeValido`, `emailValido` e `senhaValida` concentram as regras de cadastro. `emailDaSessao` recupera a identidade autenticada ou lança erro 401. O cadastro faz `INSERT` e busca o usuário inserido pelo email único. O login busca por email e confere o hash antes de abrir a sessão.
-
-`ApontamentoController` lista, busca, cria, edita, exclui e exporta. `verificarUsuario` compara um email opcional com a sessão. `buscar` retorna 404 se o id não existe e 403 se pertence a outro usuário. `validar` verifica título e tamanho do conteúdo. `prepararHorarios` calcula o período de uma nota nova ou preserva o término de uma nota existente. A criação usa `GeneratedKeyHolder` para obter o id gerado e consultar a resposta completa.
-
-### Modelos
-
-`Usuario` representa `id`, `email`, `senha`, `nome` e `criadoEm`. A senha possui `@JsonProperty(WRITE_ONLY)`: pode entrar no JSON, mas não sai nas respostas, inclusive após leitura do hash no banco.
-
-`Apontamento` representa os campos da tabela e expõe três propriedades calculadas: `inicioSemana` (segunda-feira em ISO), `dataApontamento` (data da atividade ou criação antiga) e `duracaoMinutos` (nula se não há período). Seus getters participam da serialização JSON; getters e setters também são usados pelo mapeamento JDBC e pela conversão JSON. Como os modelos não declaram construtores, Java fornece o construtor público sem argumentos; não é necessário escrevê-lo vazio.
-
-### Validações e erros
-
-- Nome: de 6 a 100 caracteres, somente letras e espaços; mínimo conferido após `trim`.
-- Email: normalizado com `trim` e minúsculas, até 254 caracteres, um `@` e domínio entre `email.com`, `gmail.com`, `hotmail.com`, `outlook.com` e `sptech.school`. Essa lista é uma regra existente, não uma validação universal de emails.
-- Senha: de 8 a 128 caracteres, pelo menos uma letra e um símbolo entre `@ ! # $ * & - _ = +`. Número não é obrigatório.
-- Título: obrigatório, não pode ser branco e tem limite de 200 caracteres. Conteúdo: opcional, nulo vira texto vazio, limite de 100000 caracteres.
-- Início: data/hora válida, menor ou igual ao término. O servidor ignora término enviado pelo cliente.
-- Semana de exportação: obrigatória e reconhecida pelo parser; datas brasileiras impossíveis são rejeitadas com resolução estrita.
-
-Erros esperados usam `ResponseStatusException`: 400 para entrada inválida, 401 para falta de autenticação, 403 para outro proprietário e 404 para id ausente. Email duplicado é capturado como `DuplicateKeyException` e retorna 409. O Spring trata JSON malformado e tipos de parâmetros inválidos. `server.error.include-message=always` permite ao frontend usar `message` da resposta; falhas internas não previstas continuam como 500.
-
-## 4. Frontend
-
-### Páginas e responsabilidades
-
-`app.js` usa `express.static` com índice automático desativado e atende `/` com `login.html`. `index.html` continua disponível por URL explícita e oferece links de navegação; foi preservado porque é uma rota pública, mesmo sem links internos apontando para ela.
-
-`login.html` e `cadastro.html` carregam `usuarios.js`. `FormData` coleta os campos com `name`, o JavaScript cria um objeto e o envia como JSON. O botão é bloqueado enquanto a requisição está em andamento. Cadastro bem-sucedido abre o login; login bem-sucedido abre o dashboard.
-
-`dashboard.html` contém o formulário, horários, seletor de semana, lista e botões. O CSS define layout e responsividade. A estrutura de cada card (título, data, trecho, rodapé e botões) está no `<template id="modeloNota">` do HTML. Esse elemento é um modelo nativo: seu conteúdo não aparece até ser copiado. `renderizarNotas` copia o card com `cloneNode(true)`, preenche os campos e o `value` dos botões com o id da nota. Os eventos de editar/excluir estão nos atributos `onclick` do próprio template. As opções de semana continuam criadas pelo JavaScript porque sua quantidade e seus valores dependem dos dados recebidos. Títulos e observações são inseridos com `textContent`, sem interpretar HTML fornecido pelo usuário. Não há preview Markdown nem bibliotecas Marked/DOMPurify na versão atual.
-
-### Estado do editor e comunicação
-
-`notaSelecionadaId` decide entre POST e PUT; `inicioEm`, `fimEm` e `notaAntiga` controlam horários; `notasCarregadas` guarda a lista retornada pela API; `salvando` evita salvamentos concorrentes e impede trocar a seleção durante o salvamento.
-
-Os dois scripts montam a URL da API com o protocolo e o host da página, na porta 8080, e usam `credentials: "include"`. Assim, acessar por `localhost` ou `127.0.0.1` mantém página e cookie no mesmo host. As operações de dados não passam pelo Express. O dashboard centraliza respostas HTTP em `requisitar`: 401 limpa o cache do usuário e abre o login; outras falhas mostram a mensagem retornada. `sessionStorage` guarda apenas um cache visual dos dados do usuário; a API sempre usa a sessão do servidor para autorizar.
-
-`iniciarPagina` prepara o editor vazio, consulta `/auth/me`, mostra o nome e carrega as notas. Ao salvar, `dadosDaNota` envia título, conteúdo, início e semana. Para notas atuais, a API recalcula a semana. O retorno preenche o editor com os valores oficiais e atualiza a lista para a semana salva. A exclusão pede confirmação no navegador e limpa o editor se a nota excluída estava selecionada.
-
-### Eventos no HTML
-
-Os eventos do frontend ficam nos atributos HTML, sem `addEventListener` ou atribuição de handlers pelo JavaScript. As funções continuam nos arquivos JavaScript já carregados pelas páginas; não é necessário colocar toda a lógica dentro de `<script>` no HTML.
-
-| Evento no HTML | Função e comportamento |
-| --- | --- |
-| `body onload="iniciarPagina()"` | Consulta a sessão e carrega as notas no dashboard. Não há uma segunda chamada automática no final do JavaScript. |
-| `onclick="atualizarLista()"` | Recarrega as notas pela API; erros aparecem na mensagem da página. |
-| `onsubmit="entrar(this); return false;"` | Lê o formulário e envia POST de login. |
-| `onsubmit="cadastrar(this); return false;"` | Lê o formulário e envia POST de cadastro. |
-| `onsubmit="salvarApontamento(); return false;"` | Envia POST ou PUT da nota, conforme a seleção. |
-| `onclick` nos botões do card | Usa o id guardado em `value` para editar a nota carregada ou excluí-la pela API. |
-| `onclick="limparNota()"` | Limpa o editor para uma nova nota. |
-| `onclick="exportarNotas()"` / `onclick="sair()"` | Solicita o relatório ou encerra a sessão. |
-| `oninput="registrarInicio()"` | Registra o início na primeira digitação do título ou conteúdo. |
-| `onchange="corrigirInicio()"` / `onchange="renderizarNotas()"` | Corrige o horário ou aplica a semana selecionada. |
-
-Os formulários usam `onsubmit` para funcionar tanto pelo botão quanto pela tecla Enter, preservando a validação nativa de campos obrigatórios e email. `return false` impede o envio tradicional que recarregaria a página. `this` representa o formulário (no submit) ou o botão (nos cards). `Number(this.value)` converte o id do botão para número.
-
-Fluxo: ação declarada no HTML → função JavaScript nomeada → `fetch` quando necessário → resposta tratada → campos da interface atualizados. Os helpers de requisição existentes continuam centralizando tratamento de erros e envio de credenciais.
-
-## 5. Banco de dados
-
-| Tabela | Campos e responsabilidades |
-| --- | --- |
-| `usuarios` | `id` identity e chave primária; `nome` obrigatório; `email` único; `senha` com hash; `criado_em` com data automática. |
-| `apontamento` | `id` identity; `email_usuario` obrigatório; `semana`; `titulo`; `conteudo` CLOB; `criado_em`; `atualizado_em`; `inicio_em`; `fim_em`. |
-
-A relação é 1:N: um usuário possui vários apontamentos. `apontamento.email_usuario` referencia `usuarios.email`; o índice `idx_apontamento_usuario` auxilia as consultas por proprietário. Não existe endpoint para alterar ou excluir usuários.
-
-`schema.sql` cria tabelas e índice se ausentes. As colunas de início/fim são adicionadas com `ADD COLUMN IF NOT EXISTS` para compatibilidade com bancos antigos; remover esse trecho impediria a atualização desses bancos. `data.sql` insere a conta demo e uma nota apenas quando o email demo ainda não existe. Reiniciar não deve recriar notas demo excluídas nem sobrescrever edições.
-
-O JDBC usa parâmetros `?` para dados do usuário, evitando montar SQL com texto recebido. A listagem ordena por `criado_em DESC, id DESC`. A edição atualiza título, conteúdo, início, semana e `atualizado_em`, preservando `fim_em`. A exclusão usa id e email da sessão. A exportação consulta todas as notas do usuário e filtra a semana em Java para também interpretar formatos antigos.
-
-O arquivo do banco é relativo ao diretório de execução: `jdbc:h2:file:./dados/logweek`. Os testes HTTP Java usam bancos em memória distintos; `PersistenciaTests` usa um arquivo H2 temporário e fecha/reabre a aplicação normalmente. Não abra uma segunda instância contra o mesmo arquivo H2; use outra URL para testes ou pare a primeira instância de forma controlada.
-
-## 6. Fluxo completo da aplicação
-
-### Cadastro e entrada
-
-Usuário preenche cadastro → HTML aplica restrições básicas → `usuarios.js` envia POST `/usuarios` → controller normaliza e valida → `SenhaUtil` gera hash → JDBC insere usuário → API retorna 201 sem senha → navegador abre login.
-
-Usuário informa credenciais → POST `/login` → JDBC busca email → hash é conferido → sessão anterior é invalidada e uma nova sessão guarda `emailUsuario` → cookie é recebido → dashboard consulta `/auth/me` e `/apontamentos` com esse cookie.
-
-### Registrar e corrigir atividade
-
-Usuário começa a digitar → `registrarInicio` captura hora civil de São Paulo → usuário salva → POST `/apontamentos` → sessão define proprietário → API valida título e período, fixa término e calcula segunda-feira → INSERT → resposta 201 com id e campos calculados → editor passa a editar essa nota e lista acompanha a semana.
-
-Ao corrigir a nota, o JavaScript envia PUT com o id. O backend verifica propriedade, conserva o término já salvo, atualiza os campos permitidos e retorna a nota atualizada. Conteúdo ausente em uma edição vira vazio; PUT não funciona como atualização parcial de todos os campos.
-
-### Consultar, excluir e exportar
-
-GET `/apontamentos` → notas ficam em memória no navegador → seletor filtra por `inicioSemana` → lista mostra somente a semana escolhida. Não há busca textual nem filtro SQL dinâmico implementados.
-
-Excluir → confirmação → DELETE por id → verificação de propriedade → DELETE no banco → 204 → lista recarregada.
-
-Gerar apontamento → POST `/apontamentos/exportar` com semana selecionada → notas da sessão são consultadas → relatório filtra, ordena, agrupa e soma → resposta de texto → navegador cria uma URL Blob temporária e a atribui ao link fixo do HTML → download `.txt` → URL temporária é liberada.
-
-## 7. Funcionalidades mais complexas
-
-### Autenticação e proteção de senha
-
-**Responsabilidade:** identificar o usuário e separar seus dados.
-
-**Onde está implementada:** `UsuarioController.validarLogin`, `emailDaSessao`, `sair`, `SenhaUtil`; configuração de sessão em `application.properties`; `requisitar` no dashboard.
-
-**Como funciona:** o cadastro gera salt aleatório de 16 bytes. PBKDF2 com HMAC-SHA256, 600000 iterações e saída de 256 bits transforma a senha. O banco guarda o texto `salt:hash`: nas contas cadastradas, salt e hash são codificados em Base64; a conta demo usa um salt textual fixo no script SQL. O login recalcula o hash e compara com `MessageDigest.isEqual`. Após sucesso, uma nova sessão recebe o email. O cookie é HttpOnly e SameSite=Lax; a sessão expira após 30 minutos sem atividade. Logout invalida a sessão.
-
-**Por que foi feita dessa maneira:** os detalhes criptográficos ficam fora do controller e a identidade fica no servidor. Assim, enviar outro email ou alterar o sessionStorage não dá acesso a notas alheias.
-
-### Horários, duração e cálculo semanal
-
-**Responsabilidade:** registrar o período e agrupar pela semana de início.
-
-**Onde está implementada:** `TempoApontamento`, getters calculados de `Apontamento`, `ApontamentoController.prepararHorarios`; `registrarInicio`, `corrigirInicio`, `atualizarHorarios`, `inicioDaSemana` no dashboard.
-
-**Como funciona:** frontend e backend usam hora civil de São Paulo e precisão de minutos. A segunda-feira é calculada subtraindo os dias decorridos desde segunda. Domingo pertence à semana anterior. O frontend usa operações UTC ao calcular dias civis para não deslocar datas pelo fuso do computador. O backend fixa o término na criação; futuras edições podem corrigir o início, mas não reabrir o período. Uma nota que atravessa a meia-noite ou outra semana fica integralmente na semana de início.
-
-**Por que foi feita dessa maneira:** evita duplicar períodos a cada salvamento e mantém frontend, JSON e relatório com uma semana comum. A interface permite corrigir a hora, mas não oferece um seletor de data para retroagir a atividade.
-
-### Compatibilidade com notas antigas
-
-**Responsabilidade:** manter acessíveis registros sem início/fim e semanas em texto.
-
-**Onde está implementada:** `TempoApontamento.lerSemana`, `semanaDaNota`, `dataDaNota`; `prepararHorarios`; `RelatorioSemanal.textoSimples`; `preencherNota` no dashboard.
-
-**Como funciona:** o parser aceita data ISO, início de período brasileiro e formatos anteriores como `24 ago - 30 ago 2026`. Para registros sem início, conserva a semana salva; se ela não puder ser interpretada, usa a semana da criação. Edição de nota antiga conserva a semana e não inventa horários. A exportação remove marcações antigas somente do texto exportado, sem regravar o conteúdo no banco. Se criação e semana divergem, o relatório usa um grupo específico de registros sem data da atividade.
-
-**Por que foi feita dessa maneira:** a versão antiga não registrava períodos completos; a aplicação preserva os dados conhecidos em vez de atribuir tempos fictícios.
-
-### Relatório semanal e download
-
-**Responsabilidade:** produzir um resumo legível com as atividades salvas.
-
-**Onde está implementada:** `ApontamentoController.exportar`, `RelatorioSemanal.gerar`, `TempoApontamento.duracao`, `exportarNotas` no dashboard.
-
-**Como funciona:** escolhe notas da semana, soma durações disponíveis, ordena por data, início e id, agrupa por dia e escreve título e observação. Quando há passagem da meia-noite, inclui a data do término. Notas sem período mostram “Horário não registrado” e não acrescentam minutos. O cabeçalho e o resumo informam quantidade, duração total e período. Semana vazia produz relatório com zero notas. O arquivo chama-se `logweek-AAAA-MM-DD.txt` e usa UTF-8.
-
-**Por que foi feita dessa maneira:** usa texto simples, sem dependência de geração de documentos, e mantém o processamento oficial no backend. Apenas notas salvas entram no arquivo; rascunhos não são enviados na exportação.
-
-## 8. Principais endpoints
-
-Base: `http://localhost:8080`, sem prefixo adicional. Campos opcionais de email precisam coincidir com a sessão.
-
-| Método | Endpoint | Responsabilidade | Entrada | Retorno |
-| --- | --- | --- | --- | --- |
-| POST | `/usuarios` | Cadastrar | JSON `nome`, `email`, `senha` | 201 usuário sem senha; 400/409 |
-| POST | `/login` | Abrir sessão | JSON `email`, `senha` | 200 usuário e cookie; 400/401 |
-| GET | `/auth/me` | Consultar sessão | Cookie | 200 usuário; 401 |
-| POST | `/auth/logout` | Encerrar sessão | Cookie, se houver; sem corpo | 204, inclusive sem sessão |
-| GET | `/apontamentos` | Listar notas próprias | Cookie; query `emailUsuario` opcional | 200 array, inclusive vazio; 401/403 |
-| GET | `/apontamentos/{id}` | Buscar uma nota | Cookie e id inteiro | 200 nota; 400/401/403/404 |
-| POST | `/apontamentos` | Criar nota | Cookie; JSON `titulo` obrigatório; `conteudo`, `inicioEm` e `emailUsuario` opcionais | 201 nota; 400/401/403 |
-| PUT | `/apontamentos/{id}` | Editar nota | Cookie, id, título obrigatório; conteúdo e início conforme regras | 200 nota; 400/401/403/404 |
-| DELETE | `/apontamentos/{id}` | Excluir nota | Cookie e id | 204 sem corpo; 400/401/403/404 |
-| POST | `/apontamentos/exportar` | Gerar TXT semanal | Cookie; JSON `semana`; `emailUsuario` opcional | 200 `text/plain;charset=UTF-8` com attachment; 400/401/403 |
-
-Na criação, **título é obrigatório**; apenas conteúdo e início são opcionais. Sem início, o servidor usa o próprio término e a duração fica zero. Semana é calculada pelo servidor para notas atuais, mesmo que venha no corpo. Nas notas antigas, a edição preserva a semana original.
-
-Exemplo de criação:
-
-```json
-{"titulo":"Configuração da rede","conteudo":"Revisei as sub-redes.","inicioEm":"2026-09-07T14:00"}
+# LogWeek
+
+O **LogWeek** é uma aplicação web desenvolvida para facilitar a criação de apontamentos semanais.
+
+A proposta é permitir que o usuário registre pequenas notas sobre suas atividades ao longo da semana e, posteriormente, gere automaticamente um relatório semanal organizado em arquivo `.txt`.
+
+---
+
+## 1. Funcionalidades
+
+A aplicação permite:
+
+* Criar uma conta;
+* Realizar login;
+* Manter o usuário autenticado durante o uso da aplicação;
+* Criar apontamentos;
+* Editar apontamentos existentes;
+* Excluir apontamentos;
+* Consultar apontamentos de semanas anteriores;
+* Visualizar o período correspondente à semana selecionada;
+* Registrar início e término das atividades;
+* Gerar um relatório semanal;
+* Exportar o relatório em `.txt`;
+* Encerrar a sessão através do logout.
+
+Os apontamentos são associados ao usuário autenticado, evitando que um usuário tenha acesso aos registros pertencentes a outra conta.
+
+---
+
+# 2. Arquitetura da aplicação
+
+O LogWeek é dividido em duas partes principais:
+
+```text
+Frontend
+HTML + CSS + JavaScript
+        |
+        | HTTP / JSON
+        v
+Backend
+Java + Spring Boot
+        |
+        | JDBC
+        v
+Banco de dados
 ```
 
-O horário precisa ser anterior ou igual ao momento do primeiro salvamento. A resposta inclui `id`, `emailUsuario`, `semana`, `titulo`, `conteudo`, `criadoEm`, `atualizadoEm`, `inicioEm`, `fimEm`, `inicioSemana`, `dataApontamento` e `duracaoMinutos`. Campos de data/hora persistidos podem vir como texto SQL com espaço; o frontend normaliza a parte usada no editor.
+O frontend é responsável pela interface e pela interação do usuário.
 
-CORS permite `http://localhost:3000` e `http://127.0.0.1:3000` com credenciais nos dois controllers. Outras origens continuam bloqueadas. A rota `/h2-console` é a interface administrativa local do H2, não um endpoint de negócio.
+O backend é responsável pelas regras da aplicação, autenticação, validações, acesso aos dados e geração do relatório semanal.
 
-## 9. Como executar o projeto
+A comunicação entre frontend e backend acontece através de requisições HTTP utilizando `fetch()`.
 
-1. Instale JDK 21 e Node.js 22 ou superior com npm; verifique `java -version`, `node --version` e `npm --version`. A revisão usou Java 21.0.11 e Node 25.9.0.
-2. Na raiz, execute `npm install` (ou `npm ci` para instalação exata pelo lockfile) e `npm start`.
-3. Em outro terminal, entre em `backend/logweek-api` e execute `.\mvnw.cmd spring-boot:run`. Em sistemas Unix, use `sh mvnw spring-boot:run`.
-4. Aguarde a inicialização Java. O H2 será aberto e os scripts SQL serão executados automaticamente. Não é necessário instalar outro banco nem executar SQL manualmente.
-5. Abra [LogWeek](http://localhost:3000), cadastre uma conta ou use `demo@email.com` / `Logweek123!`.
-6. No IntelliJ, importe o `pom.xml`, escolha JDK 21, configure o diretório de trabalho para `backend/logweek-api` e execute `LogweekApiApplication`.
+---
 
-As portas 3000 e 8080 precisam estar disponíveis. Use `http://localhost:3000` ou `http://127.0.0.1:3000`. Abrir o HTML por `file://` ou mudar uma porta sem ajustar a base da API e o CORS não corresponde à configuração atual.
+# 3. Frontend
 
-O H2 Console fica em [Console local](http://localhost:8080/h2-console): JDBC `jdbc:h2:file:./dados/logweek`, usuário `sa`, senha vazia. A configuração está em `application.properties`. Para testes externos, uma instância pode receber `--server.port=18080` e `--spring.datasource.url=jdbc:h2:file:CAMINHO_TEMPORARIO/logweek`, sem alterar esse arquivo.
+O frontend foi desenvolvido utilizando:
 
-Para compilar, testar e empacotar:
+* HTML;
+* CSS;
+* JavaScript Vanilla;
+* Node.js/Express para disponibilizar os arquivos localmente.
 
-```powershell
-# Raiz
-npm run check
-# Backend
+O servidor frontend é executado na porta:
+
+```text
+3000
+```
+
+A API Spring Boot é executada na porta:
+
+```text
+8080
+```
+
+Por isso, durante o desenvolvimento, a aplicação trabalha principalmente com:
+
+```text
+Frontend
+http://localhost:3000
+
+Backend
+http://localhost:8080
+```
+
+---
+
+## Estrutura do frontend
+
+Os arquivos HTML são responsáveis por manter a maior parte da estrutura visual da aplicação.
+
+O JavaScript é utilizado principalmente para:
+
+* Capturar informações dos formulários;
+* Fazer requisições para a API;
+* Receber as respostas do backend;
+* Preencher informações dinâmicas;
+* Renderizar os apontamentos;
+* Controlar o editor;
+* Calcular informações relacionadas às semanas;
+* Iniciar o download do relatório.
+
+Essa separação foi escolhida para evitar a criação desnecessária de grandes estruturas HTML através do JavaScript.
+
+---
+
+## usuarios.js
+
+O arquivo `usuarios.js` é responsável principalmente pelas funcionalidades relacionadas a:
+
+* Cadastro;
+* Login;
+* Comunicação dos formulários com a API.
+
+Os dados preenchidos pelo usuário são transformados em JSON e enviados através de `fetch()`.
+
+Exemplo simplificado do fluxo:
+
+```text
+Formulário
+    ↓
+usuarios.js
+    ↓
+fetch()
+    ↓
+API Spring
+    ↓
+Resposta
+```
+
+Quando o login é realizado com sucesso, o usuário é redirecionado para o dashboard.
+
+---
+
+## dashboard.js
+
+O `dashboard.js` concentra as funcionalidades relacionadas aos apontamentos.
+
+Entre suas responsabilidades estão:
+
+* Buscar apontamentos;
+* Criar apontamentos;
+* Editar apontamentos;
+* Excluir apontamentos;
+* Controlar a nota atualmente selecionada;
+* Filtrar apontamentos por semana;
+* Registrar horários;
+* Atualizar informações da interface;
+* Gerar o relatório semanal;
+* Realizar logout.
+
+As requisições são centralizadas em uma função auxiliar, evitando repetir a mesma configuração de `fetch()` em várias partes do código.
+
+---
+
+## Renderização dos apontamentos
+
+A estrutura visual dos cards fica definida diretamente no HTML através de um:
+
+```html
+<template id="modeloNota">
+```
+
+O JavaScript copia esse modelo utilizando:
+
+```javascript
+cloneNode(true)
+```
+
+e preenche apenas as informações que mudam entre os apontamentos.
+
+Dessa forma, a estrutura principal continua no HTML e o JavaScript fica responsável somente pelos dados dinâmicos.
+
+As informações fornecidas pelo usuário são inseridas utilizando `textContent`.
+
+---
+
+# 4. Comunicação com a API
+
+As requisições do frontend são enviadas diretamente para a API Spring Boot.
+
+Exemplo:
+
+```javascript
+fetch(API_URL + caminho, opcoes)
+```
+
+Como frontend e backend utilizam portas diferentes, eles possuem origens diferentes para o navegador.
+
+Por isso, os controllers utilizados pelo frontend possuem configuração CORS permitindo as origens locais utilizadas pelo projeto.
+
+Exemplo:
+
+```java
+@CrossOrigin(
+    origins = {
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    },
+    allowCredentials = "true"
+)
+```
+
+O `allowCredentials` é necessário porque a aplicação utiliza uma sessão para manter o usuário autenticado.
+
+---
+
+# 5. Autenticação e sessão
+
+O LogWeek utiliza sessão HTTP para identificar o usuário autenticado.
+
+O fluxo ocorre da seguinte maneira:
+
+```text
+Usuário envia email e senha
+        ↓
+POST /usuarios/login
+        ↓
+Backend valida os dados
+        ↓
+Sessão é criada
+        ↓
+Navegador recebe o cookie da sessão
+        ↓
+Dashboard é aberto
+        ↓
+Próximas requisições enviam o cookie
+        ↓
+Backend identifica o usuário
+```
+
+Para que o navegador envie o cookie nas requisições entre as portas `3000` e `8080`, o frontend utiliza:
+
+```javascript
+credentials: "include"
+```
+
+Essa configuração deve estar presente tanto durante o login quanto nas requisições autenticadas seguintes.
+
+O backend utiliza a sessão para determinar qual usuário está realizando a operação.
+
+Dessa forma, os apontamentos são vinculados ao usuário autenticado no servidor.
+
+---
+
+# 6. Backend
+
+O backend foi desenvolvido utilizando:
+
+* Java;
+* Spring Boot;
+* Spring Web;
+* JDBC;
+* `JdbcTemplate`.
+
+A aplicação não utiliza JPA ou Repository.
+
+O acesso ao banco é realizado diretamente através do `JdbcTemplate`, mantendo o funcionamento mais simples e direto.
+
+O fluxo principal é:
+
+```text
+Requisição HTTP
+      ↓
+Controller
+      ↓
+Validação
+      ↓
+JdbcTemplate
+      ↓
+SQL
+      ↓
+Banco
+      ↓
+Objeto Java
+      ↓
+JSON
+      ↓
+Frontend
+```
+
+---
+
+# 7. Controllers
+
+## UsuarioController
+
+O `UsuarioController` concentra as operações relacionadas aos usuários.
+
+Entre suas responsabilidades estão:
+
+* Cadastro;
+* Login;
+* Identificação do usuário atual;
+* Controle da sessão;
+* Logout.
+
+O login verifica as credenciais informadas e, quando são válidas, registra o usuário na sessão.
+
+As próximas requisições podem utilizar essa sessão para identificar quem está utilizando a aplicação.
+
+---
+
+## ApontamentoController
+
+O `ApontamentoController` concentra as operações relacionadas aos apontamentos.
+
+Entre suas responsabilidades estão:
+
+* Listar apontamentos;
+* Buscar apontamentos;
+* Criar apontamentos;
+* Editar apontamentos;
+* Excluir apontamentos;
+* Exportar o relatório semanal.
+
+Antes de realizar operações protegidas, o backend verifica se existe um usuário autenticado.
+
+Caso não exista uma sessão válida, a API pode retornar:
+
+```text
+401 Unauthorized
+```
+
+Também é feita a verificação de propriedade para impedir que um usuário manipule apontamentos pertencentes a outra conta.
+
+---
+
+# 8. CRUD de apontamentos
+
+O LogWeek implementa as quatro operações principais de um CRUD.
+
+### Create
+
+Criação de um novo apontamento:
+
+```text
+POST /apontamentos
+```
+
+### Read
+
+Listagem dos apontamentos:
+
+```text
+GET /apontamentos
+```
+
+Também existe a consulta individual quando necessária:
+
+```text
+GET /apontamentos/{id}
+```
+
+### Update
+
+Atualização de um apontamento:
+
+```text
+PUT /apontamentos/{id}
+```
+
+### Delete
+
+Exclusão:
+
+```text
+DELETE /apontamentos/{id}
+```
+
+Depois das operações que alteram dados, o frontend atualiza a lista para apresentar o estado mais recente dos apontamentos.
+
+---
+
+# 9. Fluxo de criação de um apontamento
+
+Quando o usuário começa a preencher uma nova nota, o frontend registra o horário inicial da atividade.
+
+Ao salvar:
+
+```text
+Usuário escreve a nota
+        ↓
+JavaScript coleta os dados
+        ↓
+POST /apontamentos
+        ↓
+Backend identifica o usuário pela sessão
+        ↓
+Backend valida os dados
+        ↓
+JdbcTemplate executa INSERT
+        ↓
+Banco salva o apontamento
+        ↓
+API retorna o apontamento
+        ↓
+Frontend atualiza a interface
+```
+
+Quando uma nota já existente está selecionada, o frontend utiliza `PUT` em vez de `POST`.
+
+---
+
+# 10. Organização semanal
+
+Uma das principais regras do LogWeek é a organização das notas por semana.
+
+O sistema calcula o início da semana e utiliza essa informação para organizar os apontamentos.
+
+A semana utilizada pelo sistema começa na:
+
+```text
+Segunda-feira
+```
+
+e termina no:
+
+```text
+Domingo
+```
+
+O frontend utiliza essas informações para apresentar períodos e permitir que o usuário consulte seus registros de diferentes semanas.
+
+Parte dessa lógica fica no JavaScript para atualização da interface, enquanto o backend mantém as informações utilizadas oficialmente pelos apontamentos.
+
+---
+
+# 11. Horários
+
+O sistema registra informações relacionadas ao período da atividade.
+
+O início pode ser registrado quando o usuário começa a preencher a nota.
+
+No primeiro salvamento, o backend determina o término da atividade.
+
+Essas informações permitem apresentar a duração do apontamento e utilizá-la posteriormente no relatório semanal.
+
+As funções relacionadas a horário e semana são uma das partes mais importantes da regra de negócio do LogWeek.
+
+---
+
+# 12. Relatório semanal
+
+O usuário pode gerar um relatório contendo os apontamentos da semana selecionada.
+
+A requisição utilizada é:
+
+```text
+POST /apontamentos/exportar
+```
+
+O backend recebe a semana, seleciona os apontamentos correspondentes e monta o conteúdo do relatório.
+
+O resultado é retornado como texto.
+
+O navegador transforma a resposta em um arquivo utilizando `Blob` e inicia o download.
+
+O arquivo utiliza o formato:
+
+```text
+.txt
+```
+
+Essa abordagem permite gerar um relatório organizado sem utilizar bibliotecas externas de PDF ou documentos.
+
+---
+
+# 13. Principais endpoints
+
+| Método | Endpoint                 | Responsabilidade               |
+| ------ | ------------------------ | ------------------------------ |
+| POST   | `/usuarios`              | Cadastrar usuário              |
+| POST   | `/usuarios/login`        | Realizar login                 |
+| GET    | `/usuarios/atual`        | Consultar usuário autenticado  |
+| POST   | `/usuarios/logout`       | Encerrar sessão                |
+| GET    | `/apontamentos`          | Listar apontamentos do usuário |
+| GET    | `/apontamentos/{id}`     | Buscar apontamento             |
+| POST   | `/apontamentos`          | Criar apontamento              |
+| PUT    | `/apontamentos/{id}`     | Editar apontamento             |
+| DELETE | `/apontamentos/{id}`     | Excluir apontamento            |
+| POST   | `/apontamentos/exportar` | Gerar relatório semanal        |
+
+Todos os endpoints relacionados aos apontamentos protegidos dependem da sessão do usuário.
+
+---
+
+# 14. Status HTTP
+
+A API utiliza códigos HTTP para indicar o resultado das operações.
+
+Entre os principais estão:
+
+| Status             | Significado                                         |
+| ------------------ | --------------------------------------------------- |
+| `200 OK`           | Operação realizada com sucesso                      |
+| `201 Created`      | Registro criado                                     |
+| `204 No Content`   | Operação concluída sem conteúdo de resposta         |
+| `400 Bad Request`  | Dados enviados são inválidos                        |
+| `401 Unauthorized` | Usuário não está autenticado                        |
+| `403 Forbidden`    | Usuário não possui permissão para acessar o recurso |
+| `404 Not Found`    | Registro não encontrado                             |
+| `409 Conflict`     | Conflito com um registro existente                  |
+
+---
+
+# 15. Segurança das consultas
+
+As consultas SQL utilizam parâmetros através do `JdbcTemplate`.
+
+Exemplo conceitual:
+
+```java
+jdbcTemplate.query(
+    "SELECT * FROM apontamento WHERE email_usuario = ?",
+    mapper,
+    email
+);
+```
+
+O valor recebido não é concatenado diretamente na String SQL.
+
+Além disso, a identificação do usuário utilizada nas operações protegidas é controlada pelo backend através da sessão.
+
+Isso evita depender somente de informações enviadas pelo navegador para determinar o proprietário de um apontamento.
+
+---
+
+# 16. Separação de responsabilidades
+
+De forma resumida:
+
+### HTML
+
+Responsável pela estrutura das páginas.
+
+### CSS
+
+Responsável pela aparência e responsividade.
+
+### JavaScript
+
+Responsável por:
+
+* Eventos;
+* Requisições;
+* Dados dinâmicos;
+* Controle da interface.
+
+### Spring Boot
+
+Responsável por:
+
+* API;
+* Regras de negócio;
+* Sessão;
+* Validações;
+* Comunicação com o banco;
+* Relatório semanal.
+
+### Banco de dados
+
+Responsável pela persistência dos usuários e apontamentos.
+
+---
+
+# 17. Como executar
+
+## Frontend
+
+Na raiz do projeto:
+
+```bash
+npm install
+npm start
+```
+
+Depois acesse:
+
+```text
+http://localhost:3000
+```
+
+---
+
+## Backend
+
+Entre no diretório do backend:
+
+```bash
 cd backend/logweek-api
-.\mvnw.cmd clean verify
-# Executar o pacote gerado, ainda no diretório do backend
-java -jar target/logweek-api-0.0.1-SNAPSHOT.jar
 ```
 
-O primeiro uso do Wrapper/build requer acesso ao Maven Central. Falha de rede não significa falha de código; em ambiente restrito é necessário permitir o download. Verifique se `node` e `npm` pertencem à mesma instalação caso o terminal não encontre o npm.
+No Windows:
 
-## 10. Observações importantes
+```bash
+.\mvnw.cmd spring-boot:run
+```
 
-- A versão atual é configurada para execução local: console H2 habilitado, conta demo, HTTP e duas origens locais permitidas. Publicação exige uma configuração própria para essas condições; não foi realizada nesta revisão.
-- A API carrega todas as notas do usuário; o filtro visual e o filtro do relatório são feitos em memória. Não há paginação ou busca textual.
-- Durações são somadas sem descontar sobreposição entre notas. Isso preserva a regra atual. Tempos representam hora civil, sem offset armazenado; o editor calcula duração com `-03:00`, adequado às atividades atuais, mas não modela mudanças históricas de horário de verão.
-- `criado_em` e `atualizado_em` vêm do relógio do banco; início/fim usam São Paulo. Em máquinas com outro fuso, esses campos podem representar convenções distintas, especialmente em registros antigos.
-- O parser legado usa a data inicial para identificar a semana; o final do texto não é uma segunda validação de intervalo. Para novas integrações, prefira `semana` ISO da segunda-feira retornada como `inicioSemana`.
-- O frontend remove espaços das extremidades do conteúdo ao salvar. A API aceita conteúdo vazio e trata ausência como vazio também em PUT.
-- Navegar para outra nota, iniciar uma nova ou sair não oferece confirmação para descartar rascunho. Não há salvamento automático.
-- SQL de compatibilidade, getters/setters usados pelo framework, Maven Wrapper, lockfile e página `index.html` fazem parte do projeto. O banco e as configurações da IDE são apenas locais e ficam fora do versionamento.
-- Os testes Java de integração executam HTTP real e usam bancos isolados. Não há uma suíte JavaScript no repositório: `npm run check` verifica apenas a sintaxe de `app.js`, `usuarios.js` e `dashboard.js`.
+Em Linux/macOS:
 
+```bash
+./mvnw spring-boot:run
+```
 
-### Convenções de nomes
+A API será disponibilizada em:
 
-**LogWeek** é o nome apresentado ao usuário. `logweek` e `logweek-api` são identificadores técnicos usados no pacote npm, artefato Maven, banco e arquivos exportados. `LogweekApiApplication` e `school.sptech.logweek_api` mantêm os nomes do código Java. `LOGWEEK` é a versão em maiúsculas usada no cabeçalho do relatório e no painel.
+```text
+http://localhost:8080
+```
 
-Uma **nota** é o registro individual de uma atividade; **apontamento semanal** é o relatório que reúne essas notas. O nome técnico `/apontamentos` da API e a tabela `apontamento` representam os registros individuais e foram preservados para manter o contrato da aplicação.
+---
 
-### Verificação para distribuição
+# 18. Fluxo completo
 
-Execute `npm ci` e `npm run check` na raiz, e `mvnw.cmd clean verify` dentro do backend (ou `sh mvnw clean verify` em Unix). Uma instalação nova não precisa receber o arquivo do banco: `spring.sql.init.mode=always` executa os scripts idempotentes de criação e dados demo. `PersistenciaTests` verifica esse fluxo com um arquivo temporário e confere a preservação de edição e exclusão ao reabrir a aplicação.
+O funcionamento principal pode ser resumido da seguinte maneira:
 
-A configuração também explicita UTF-8 dos scripts SQL, mensagens de erro enviadas ao frontend e as propriedades de sessão descritas acima. Não são necessárias configurações pessoais de IDE para executar pelo terminal.
+```text
+              USUÁRIO
+                 |
+                 v
+           HTML / CSS
+                 |
+                 v
+            JavaScript
+                 |
+              fetch()
+                 |
+                 v
+          Spring Boot
+                 |
+          sessão + regras
+                 |
+                 v
+           JdbcTemplate
+                 |
+                 v
+          Banco de dados
+```
 
-A suíte Java mantém testes de fluxo HTTP, permissões entre usuários, horários, exportação, CORS e persistência. As dependências de teste são `spring-boot-test` e `junit-jupiter`; não são usados Mockito, MockMvc, AssertJ ou ferramentas de teste XML/JSON. O teste vazio `contextLoads` foi removido por repetir a inicialização já exercitada pelos testes de integração. As configurações Git agora ficam na raiz, evitando arquivos duplicados no módulo.
+No login:
 
-### Revisão de 09/09/2026
+```text
+Login
+  ↓
+Backend valida
+  ↓
+Cria sessão
+  ↓
+Dashboard
+```
 
-A versão recebida compilou e passou nos testes antes das alterações: não foi reproduzido erro de package, import ou dependência ausente causado pela mudança de repositório. Foi reproduzido um bloqueio de CORS ao abrir o frontend por `127.0.0.1:3000`: a API aceitava apenas `localhost:3000`, e os scripts sempre apontavam para `localhost:8080`. A correção mantém o host usado no navegador e permite as duas origens locais, preservando a autenticação por sessão.
+Durante o uso:
 
-O backend continua usando SQL direto nos controllers e os mesmos auxiliares de senha, tempo e relatório. A revisão tornou imports, métodos e validações mais legíveis, removeu construtores vazios redundantes, o teste de contexto vazio e configurações Git duplicadas. A dependência indireta npm `qs` foi atualizada dentro da faixa compatível com Express. O schema, os dados existentes e as regras de negócio foram preservados.
+```text
+Dashboard
+   ↓
+cookie da sessão
+   ↓
+API identifica usuário
+   ↓
+CRUD dos apontamentos
+```
 
-Validação realizada:
+E na exportação:
 
-- `mvnw.cmd clean verify`: build aprovado, 8 testes, sem falhas ou erros; inclui HTTP real, isolamento entre usuários, exportação, CORS e persistência em arquivo após reiniciar.
-- `npm ci` e `npm run check`: instalação reproduzível e sintaxe aprovadas; zero vulnerabilidades reportadas pelo npm nesta execução.
-- Spring Boot iniciado pela raiz com `mvnw.cmd -f backend/logweek-api/pom.xml spring-boot:run`, confirmando o diretório de trabalho do módulo; os testes manuais usaram banco temporário.
-- Navegador: login em `localhost` e `127.0.0.1`; criação, edição, geração de relatório e logout pelo frontend em `127.0.0.1`.
-- Referências e alterações conferidas com busca no código, `git diff --check` e revisão independente. Os servidores temporários foram encerrados ao concluir os testes.
+```text
+Semana selecionada
+       ↓
+Backend reúne as notas
+       ↓
+Gera o relatório
+       ↓
+Resposta em texto
+       ↓
+Blob no navegador
+       ↓
+Arquivo .txt
+```
+
+---
+
+# 19. Considerações finais
+
+O LogWeek foi desenvolvido priorizando uma arquitetura simples e compatível com os conceitos trabalhados durante o desenvolvimento acadêmico.
+
+O projeto utiliza tecnologias separadas de forma clara:
+
+```text
+HTML/CSS → estrutura e aparência
+JavaScript → interação e requisições
+Spring Boot → API e regras
+JdbcTemplate → acesso aos dados
+Banco → persistência
+```
+
+A aplicação evita abstrações desnecessárias e mantém o fluxo das funcionalidades visível no código, facilitando tanto a manutenção quanto a explicação técnica do projeto.
+
+As principais regras de negócio estão relacionadas à autenticação por sessão, controle dos apontamentos de cada usuário, registro dos períodos das atividades, organização semanal e geração automática do apontamento semanal em `.txt`.
