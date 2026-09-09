@@ -1,42 +1,239 @@
-# LogWeek
+# 📝 LogWeek
 
-**Registre suas atividades ao longo da semana e transforme suas notas em um apontamento semanal organizado.**
+> **Registre durante a semana. Organize com um clique.**
 
-O LogWeek é um projeto acadêmico que ajuda a reunir o que foi feito durante a semana em um só lugar. Em vez de depender da memória para escrever o relatório no final do período, você pode registrar cada atividade enquanto trabalha e gerar um arquivo de texto com as notas salvas.
+O **LogWeek** foi criado para tornar os apontamentos semanais mais simples.
 
-## Como o LogWeek facilita os apontamentos
+Em vez de chegar ao fim da semana tentando lembrar **o que você fez, quando fez e quanto tempo levou**, você pode registrar pequenas notas enquanto trabalha.
 
-- **Notas rápidas:** registre um título e, quando necessário, uma observação sobre a atividade.
-- **Horários automáticos:** o início é marcado na primeira digitação e o término no primeiro salvamento. É possível corrigir a hora de início.
-- **Organização por semana:** as atividades são agrupadas pela semana de início, de segunda-feira a domingo.
-- **Histórico acessível:** selecione uma semana para consultar, editar ou excluir suas notas.
-- **Relatório pronto para compartilhar:** gere um `.txt` com atividades agrupadas por dia, horários, quantidade de notas e soma do tempo registrado.
-- **Dados por usuário:** cada conta acessa seus próprios apontamentos, que permanecem salvos ao encerrar normalmente a aplicação.
+No final, o LogWeek reúne seus registros e transforma tudo em um **apontamento semanal organizado e pronto para compartilhar**.
 
-### Um exemplo de uso
+---
 
-1. Entre na sua conta e comece uma nota, como “Configuração da rede”.
-2. Acrescente uma observação sobre o que fez e salve ao terminar.
-3. Repita ao longo da semana.
-4. Selecione a semana desejada e clique em **Gerar apontamento semanal**.
+## 💡 Por que usar o LogWeek?
 
-O arquivo reúne as notas já salvas. Rascunhos não entram no relatório; não há salvamento automático. Durações de atividades simultâneas são somadas sem descontar sobreposições.
+Imagine que durante a semana você:
 
-## Tecnologias
+* configurou uma rede;
+* participou de uma reunião;
+* corrigiu um problema;
+* estudou uma nova tecnologia;
+* desenvolveu uma funcionalidade.
 
-| Parte | Tecnologias |
-| --- | --- |
-| Frontend | HTML, CSS e JavaScript vanilla, com eventos declarados no HTML |
-| Servidor das páginas | Node.js e Express 5.2.1 |
-| Backend | Java 21, Spring Boot 4.1.1 e JdbcTemplate |
-| Banco de dados | H2 em arquivo, iniciado junto com o backend |
-| Relatório | Texto simples em UTF-8 (`.txt`) |
+Na sexta-feira, lembrar de todos esses detalhes pode ser difícil.
 
-## Executar localmente
+Com o LogWeek, você registra cada atividade quando ela acontece e deixa a organização para depois.
 
-Requisitos: **JDK 21**, **Node.js 22 ou superior** com npm e acesso à internet para baixar dependências na primeira execução. Os comandos devem ser executados na pasta do projeto baixado ou clonado.
+```text id="p3z1ax"
+Durante a semana                  No final da semana
 
-### 1. Iniciar o frontend
+📝 Pequenas notas                   📋 Apontamento organizado
+🕐 Horários registrados      →       📅 Separado por dia
+📌 Atividades salvas                ⏱️ Tempo registrado
+                                    📄 Arquivo .txt
+```
+
+---
+
+## ✨ O que você pode fazer?
+
+### 📝 Registre atividades rapidamente
+
+Crie uma nota com um título simples e, quando precisar, acrescente uma observação.
+
+Por exemplo:
+
+```text id="4w0w1e"
+Configuração da VPC
+
+Configurei as sub-redes pública e privada e
+revisei algumas regras de comunicação entre
+as instâncias.
+```
+
+A ideia é não precisar escrever um relatório completo toda vez que terminar uma atividade.
+
+---
+
+### ⏱️ Deixe o LogWeek cuidar dos horários
+
+Ao começar a escrever uma nova atividade, o LogWeek registra o horário inicial.
+
+Quando ela é salva pela primeira vez, o término também é registrado.
+
+Se necessário, você ainda pode corrigir o horário de início.
+
+Assim, você pode se concentrar em registrar **o que fez**, sem precisar controlar manualmente cada horário.
+
+---
+
+### 📅 Acompanhe suas semanas
+
+Seus registros são organizados semanalmente, considerando:
+
+**Segunda-feira → Domingo**
+
+Você pode navegar entre as semanas e consultar as atividades que já registrou.
+
+Isso cria um pequeno histórico do seu trabalho e evita que informações importantes dependam apenas da memória.
+
+---
+
+### ✏️ Corrija quando precisar
+
+Esqueceu alguma informação?
+
+Você pode voltar a um apontamento salvo para:
+
+* editar o título;
+* alterar a observação;
+* corrigir informações;
+* ou excluir o registro.
+
+As alterações ficam refletidas no seu histórico.
+
+---
+
+### 📄 Gere seu apontamento semanal
+
+Depois de registrar suas atividades ao longo da semana, basta selecionar o período desejado e clicar em:
+
+**Gerar apontamento semanal**
+
+O LogWeek reúne as notas salvas e cria automaticamente um arquivo `.txt` organizado.
+
+O relatório pode reunir informações como:
+
+```text id="q56w9z"
+LOGWEEK
+Apontamento semanal
+01/09/2026 - 07/09/2026
+
+SEGUNDA-FEIRA
+
+09:00 - 10:20
+Configuração da rede
+
+Revisei as sub-redes e finalizei
+a comunicação entre as instâncias.
+
+
+TERÇA-FEIRA
+
+14:10 - 15:00
+Correção da API
+
+Corrigi a validação utilizada durante
+o cadastro de usuários.
+
+
+RESUMO DA SEMANA
+
+Atividades registradas: 2
+Tempo registrado: 2h10min
+```
+
+Assim, várias pequenas anotações feitas durante a semana se transformam em um único documento.
+
+---
+
+## 🔐 Seus apontamentos ficam na sua conta
+
+O LogWeek possui cadastro e login.
+
+Cada usuário possui seus próprios apontamentos, então ao entrar na aplicação você visualiza apenas as atividades relacionadas à sua conta.
+
+Você também pode encerrar sua sessão através do botão de logout.
+
+---
+
+## 🚀 Como usar
+
+O fluxo foi pensado para ser simples:
+
+```text id="b9jq94"
+1. Entre na sua conta
+        ↓
+2. Comece uma nova nota
+        ↓
+3. Descreva rapidamente sua atividade
+        ↓
+4. Salve
+        ↓
+5. Continue registrando durante a semana
+        ↓
+6. Escolha a semana desejada
+        ↓
+7. Gere seu apontamento
+```
+
+Você não precisa escrever tudo de uma vez.
+
+A proposta do LogWeek é justamente transformar **pequenos registros feitos naturalmente durante o trabalho** em um relatório mais completo no final da semana.
+
+---
+
+## 🎯 Para quem é o LogWeek?
+
+O projeto pode ser útil para pessoas que precisam registrar atividades recorrentes, como:
+
+* estudantes;
+* estagiários;
+* desenvolvedores;
+* profissionais de tecnologia;
+* equipes que realizam apontamentos;
+* pessoas que precisam prestar contas das atividades realizadas durante a semana.
+
+Principalmente para quem já pensou:
+
+> *"O que mesmo eu fiz durante essa semana?"*
+
+---
+
+## ⚠️ Algumas coisas importantes
+
+O LogWeek trabalha com as **notas que você salvou**.
+
+Por isso, uma atividade que ainda está sendo escrita e não foi salva não aparecerá no relatório semanal.
+
+Também não existe salvamento automático no momento.
+
+Se duas atividades tiverem horários sobrepostos, seus tempos são contabilizados individualmente.
+
+---
+
+## 🎓 Sobre o projeto
+
+O LogWeek é um **projeto acadêmico** desenvolvido com o objetivo de aplicar conceitos de desenvolvimento web na solução de um problema simples do cotidiano.
+
+A aplicação utiliza:
+
+* HTML;
+* CSS;
+* JavaScript;
+* Java;
+* Spring Boot;
+* JDBC;
+* H2;
+* Node.js e Express.
+
+O projeto foi construído priorizando uma interface simples e um fluxo rápido para registrar atividades.
+
+---
+
+## 💻 Executando o projeto localmente
+
+> Esta seção é destinada a quem deseja executar o código do LogWeek.
+
+### Requisitos
+
+Você precisará ter instalado:
+
+* **JDK 21**
+* **Node.js 22 ou superior**
+* **npm**
+
+### 1. Inicie as páginas
 
 Na raiz do projeto:
 
@@ -45,95 +242,57 @@ npm ci
 npm start
 ```
 
-### 2. Iniciar o backend
+### 2. Inicie a API
 
-Em outro terminal, no Windows:
+Em outro terminal:
+
+**Windows**
 
 ```powershell
 cd backend/logweek-api
 .\mvnw.cmd spring-boot:run
 ```
 
-No Linux ou macOS:
+**Linux/macOS**
 
 ```sh
 cd backend/logweek-api
 sh mvnw spring-boot:run
 ```
 
-O Maven Wrapper acompanha o projeto; não é necessário instalar Maven separadamente. Se preferir iniciar o backend sem sair da raiz, no Windows use:
+### 3. Abra o LogWeek
 
-```powershell
-.\backend\logweek-api\mvnw.cmd -f backend/logweek-api/pom.xml spring-boot:run
+Com os dois serviços funcionando, acesse:
+
+**http://localhost:3000**
+
+O banco de dados é preparado automaticamente na primeira execução.
+
+Para testar rapidamente a aplicação, também existe uma conta de demonstração:
+
+```text id="kg8p9m"
+Email: demo@email.com
+Senha: Logweek123!
 ```
 
-O plugin do Spring Boot usa a pasta do módulo como diretório de trabalho.
+---
 
-### 3. Abrir a aplicação
+## 📚 Quer entender como ele funciona por dentro?
 
-Acesse [LogWeek](http://localhost:3000). A API atende na porta 8080. Também é possível abrir [LogWeek por IP local](http://127.0.0.1:3000): o frontend usa o mesmo host da página para preservar a sessão. Abra as páginas pelo Express, não diretamente como arquivos.
+Este README apresenta o LogWeek principalmente pela perspectiva de quem utiliza a ferramenta.
 
-Cadastre uma conta ou use a conta de demonstração:
+A arquitetura, endpoints, banco de dados, autenticação, regras de negócio e funcionamento interno estão documentados separadamente em:
 
-- Email: `demo@email.com`
-- Senha: `Logweek123!`
+**`DOCUMENTACAO_TECNICA.md`**
 
-O banco e a conta demo são criados automaticamente quando necessários. Execute o backend dentro de `backend/logweek-api`: os dados ficam em `dados/logweek.mv.db`, relativo a esse diretório. No IntelliJ, importe `backend/logweek-api/pom.xml` como projeto Maven, selecione JDK 21, use esse diretório de trabalho e execute `LogweekApiApplication`. Se abrir a raiz como pasta, adicione esse POM pela janela Maven. Não é necessário copiar configurações `.idea` do repositório anterior.
+---
 
-O banco local não vai para o GitHub. Não apague o arquivo de dados caso queira preservar suas notas. As portas 3000 e 8080 precisam estar disponíveis.
+## 🌱 Objetivo
 
-## Estrutura do repositório
+O LogWeek nasceu de uma ideia simples:
 
-```text
-logweek/
-├── README.md                      # Apresentação e execução
-├── DOCUMENTACAO_TECNICA.md         # Fluxos, regras e endpoints
-├── .gitignore                     # Arquivos locais fora do versionamento
-├── .gitattributes                 # Finais de linha entre sistemas
-├── package.json
-├── package-lock.json
-├── app.js                         # Servidor das páginas
-├── public/
-│   ├── index.html                 # Apresentação, acessível por /index.html
-│   ├── login.html                 # Página atendida em /
-│   ├── cadastro.html
-│   ├── dashboard.html
-│   ├── styles.css
-│   └── js/
-│       ├── usuarios.js
-│       └── dashboard.js
-└── backend/logweek-api/
-    ├── pom.xml
-    ├── mvnw / mvnw.cmd / .mvn/    # Maven Wrapper
-    └── src/
-        ├── main/java/             # Controllers, modelos e auxiliares
-        ├── main/resources/        # Configuração, schema.sql e data.sql
-        └── test/java/             # Testes automatizados do backend
-```
+**você não deveria precisar reconstruir sua semana inteira de memória para conseguir escrever um apontamento.**
 
-A estrutura mantém o frontend simples e o SQL próximo dos controllers. A [Documentação Técnica](DOCUMENTACAO_TECNICA.md) explica o caminho de uma ação no HTML até o banco e a resposta exibida na tela.
+Registre enquanto acontece.
 
-## Verificações
-
-Na raiz, verifique a sintaxe dos arquivos JavaScript:
-
-```sh
-npm run check
-```
-
-Esse comando verifica sintaxe; não executa testes funcionais do frontend. Atualmente não há suíte JavaScript versionada.
-
-No backend, compile e execute os testes:
-
-```powershell
-cd backend/logweek-api
-.\mvnw.cmd clean verify
-```
-
-No Linux/macOS, use `sh mvnw clean verify`. Os testes usam H2 em memória ou arquivo temporário isolado e não alteram suas notas. O comando gera o pacote `target/logweek-api-0.0.1-SNAPSHOT.jar`. Encerre uma execução desse JAR antes de usar `clean`, pois o Windows mantém o arquivo em uso. Os testes mantidos cobrem API, CORS, datas e persistência; o teste vazio de inicialização foi removido porque os testes de integração já iniciam o Spring Boot.
-
-## Arquivos locais e configuração
-
-`node_modules/`, `target/`, bancos H2, logs, configurações de IDE e arquivos `.env` são ignorados pelo Git. O lockfile npm, o Maven Wrapper e os scripts SQL fazem parte do repositório e permitem reconstruir a aplicação em outra máquina.
-
-O projeto está configurado para estudo e execução local, com conta demo e [H2 Console](http://localhost:8080/h2-console) habilitados. No console: JDBC `jdbc:h2:file:./dados/logweek`, usuário `sa`, senha vazia. Hospedar a aplicação exige configurar ambiente, origem da API e acesso ao banco; o GitHub hospeda o código, não executa este backend automaticamente.
+No final da semana, deixe o **LogWeek** organizar para você.
